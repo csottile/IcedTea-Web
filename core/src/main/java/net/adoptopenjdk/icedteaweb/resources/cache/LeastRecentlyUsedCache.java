@@ -100,32 +100,37 @@ class LeastRecentlyUsedCache {
         this.rootCacheDir = cacheDir;
     }
 
-    File getOrCreateCacheFile(URL resourceHref, VersionId version) {
-        final LeastRecentlyUsedCacheEntry entry = cacheIndex.getSynchronized(idx ->
-                getOrCreateCacheEntry(idx, resourceHref, version)
-        );
+
+    File getCacheFile(final URL resourceHref, final VersionId version) {
+        final LeastRecentlyUsedCacheEntry entry = cacheIndex.getSynchronized(idx -> getCacheEntry(idx, resourceHref, version).orElseThrow(() -> new IllegalStateException("No Entry in cache for " + idx)));
         return getCacheFile(entry);
     }
 
-    private LeastRecentlyUsedCacheEntry getOrCreateCacheEntry(LeastRecentlyUsedCacheIndex idx, URL resourceHref, VersionId version) {
-        return idx.findAndMarkAsAccessed(resourceHref, version)
-                .orElseGet(() -> createNewInfoFileAndIndexEntry(idx, resourceHref, version));
-    }
-
-    File replaceExistingCacheFile(URL resourceHref, VersionId version) {
-        final LeastRecentlyUsedCacheEntry entry = cacheIndex.getSynchronized(idx -> {
-            // Old entry will still exist. (but removed at cleanup)
-            idx.markEntryForDeletion(resourceHref, version);
-            return createNewInfoFileAndIndexEntry(idx, resourceHref, version);
-        });
+    File createCacheFile(final URL resourceHref, final VersionId version) {
+        final LeastRecentlyUsedCacheEntry entry = cacheIndex.getSynchronized(idx -> createCacheEntry(idx, resourceHref, version));
         return getCacheFile(entry);
     }
 
-    void markAsCorrupted(URL resourceHref, VersionId version) {
+    private Optional<LeastRecentlyUsedCacheEntry> getCacheEntry(final LeastRecentlyUsedCacheIndex idx, final URL resourceHref, final VersionId version) {
+        return idx.findAndMarkAsAccessed(resourceHref, version);
+    }
+
+    private LeastRecentlyUsedCacheEntry createCacheEntry(final LeastRecentlyUsedCacheIndex idx, final URL resourceHref, final VersionId version) {
+        if (getCacheEntry(idx, resourceHref, version).isPresent()) {
+            throw new IllegalStateException("Entry for given resource already in cache. ResourceUrl: " + resourceHref);
+        }
+        return createNewInfoFileAndIndexEntry(idx, resourceHref, version);
+    }
+
+    void invalidateExistingCacheFile(final URL resourceHref, final VersionId version) {
         cacheIndex.runSynchronized(idx -> idx.markEntryForDeletion(resourceHref, version));
     }
 
-    private LeastRecentlyUsedCacheEntry createNewInfoFileAndIndexEntry(LeastRecentlyUsedCacheIndex idx, URL resourceHref, VersionId version) {
+    void markAsCorrupted(final URL resourceHref, final VersionId version) {
+        cacheIndex.runSynchronized(idx -> idx.markEntryForDeletion(resourceHref, version));
+    }
+
+    private LeastRecentlyUsedCacheEntry createNewInfoFileAndIndexEntry(final LeastRecentlyUsedCacheIndex idx, final URL resourceHref, final VersionId version) {
         final File dir = makeNewCacheDir();
         final String entryId = entryIdFromCacheDir(dir);
         createInfoFile(dir);
@@ -136,8 +141,8 @@ class LeastRecentlyUsedCache {
         final String cacheDirPath = rootCacheDir.getFullPath();
         for (int i = 0; i < 250; i++) {
             for (int j = 0; j < 250; j++) {
-                String path = cacheDirPath + File.separator + i + File.separator + j;
-                File cDir = new File(path);
+                final String path = cacheDirPath + File.separator + i + File.separator + j;
+                final File cDir = new File(path);
                 if (!cDir.exists()) {
                     if (cDir.mkdirs()) {
                         return cDir;
@@ -149,7 +154,7 @@ class LeastRecentlyUsedCache {
         throw new RuntimeException("Out of directories :-)");
     }
 
-    private void createInfoFile(File dir) {
+    private void createInfoFile(final File dir) {
         try {
             final File infoFile = new File(dir, CacheEntry.INFO_SUFFIX);
             RestrictedFileUtils.createRestrictedFile(infoFile); // Create the info file for marking later.
@@ -162,16 +167,16 @@ class LeastRecentlyUsedCache {
                 propertiesFile.setProperty(CacheEntry.KEY_JNLP_PATH, jnlpPath);
                 propertiesFile.store();
             }
-        } catch (IOException e) {
+        } catch (final IOException e) {
             throw new RuntimeException("Failed to create info file in dir " + dir, e);
         }
     }
 
-    File addToCache(DownloadInfo info, InputStream inputStream) throws IOException {
+    File addToCache(final DownloadInfo info, final InputStream inputStream) throws IOException {
         final List<IOException> ex = new ArrayList<>();
 
         final LeastRecentlyUsedCacheEntry entry = cacheIndex.getSynchronized(idx ->
-                getOrCreateCacheEntry(idx, info.getResourceHref(), info.getVersion())
+                createCacheEntry(idx, info.getResourceHref(), info.getVersion())
         );
 
         final CacheEntry infoFile = getInfoFile(entry);
@@ -182,7 +187,7 @@ class LeastRecentlyUsedCache {
                 IOUtils.copy(inputStream, out);
             }
             infoFile.storeInfo(info.getDownloadedAt(), info.getLastModified(), cacheFile.length());
-        } catch (IOException e) {
+        } catch (final IOException e) {
             ex.add(e);
         }
 
@@ -193,7 +198,7 @@ class LeastRecentlyUsedCache {
         return cacheFile;
     }
 
-    Optional<CacheEntry> getResourceInfo(URL resourceHref, VersionId version) {
+    Optional<CacheEntry> getResourceInfo(final URL resourceHref, final VersionId version) {
         return cacheIndex.getSynchronized(idx -> idx.find(resourceHref, version))
                 .map(this::getInfoFile);
     }
@@ -206,7 +211,7 @@ class LeastRecentlyUsedCache {
      * @return whether the cache contains the version
      * @throws IllegalArgumentException if the resourceHref is not cacheable
      */
-    boolean isCached(URL resourceHref, VersionId version) {
+    boolean isCached(final URL resourceHref, final VersionId version) {
         final boolean isCached = getResourceInfo(resourceHref, version)
                 .map(CacheEntry::isCached)
                 .orElse(false);
@@ -223,7 +228,7 @@ class LeastRecentlyUsedCache {
      * @return whether the cache contains the version
      * @throws IllegalArgumentException if the resourceHref is not cacheable
      */
-    boolean isUpToDate(URL resourceHref, VersionId version, long lastModified) {
+    boolean isUpToDate(final URL resourceHref, final VersionId version, final long lastModified) {
         final Boolean isUpToDate = cacheIndex.getSynchronized(idx -> idx.findAndMarkAsAccessed(resourceHref, version))
                 .map(e -> getInfoFile(e).isCurrent(lastModified))
                 .orElse(false);
@@ -261,7 +266,7 @@ class LeastRecentlyUsedCache {
         });
     }
 
-    List<CacheId> getCacheIds(String filter, boolean includeJnlpPath, boolean includeDomain) {
+    List<CacheId> getCacheIds(final String filter, final boolean includeJnlpPath, final boolean includeDomain) {
         if (!includeJnlpPath && !includeDomain) {
             return Collections.emptyList();
         }
@@ -291,24 +296,24 @@ class LeastRecentlyUsedCache {
         return new ArrayList<>(result.values());
     }
 
-    private CacheFile createPaneObjectArray(LeastRecentlyUsedCacheEntry entry) {
+    private CacheFile createPaneObjectArray(final LeastRecentlyUsedCacheEntry entry) {
         final CacheEntry infoFile = getInfoFile(entry);
         return new CacheFile(infoFile, entry);
     }
 
-    void deleteFromCache(URL resourceHref, VersionId version) {
+    void deleteFromCache(final URL resourceHref, final VersionId version) {
         cacheIndex.runSynchronized(idx -> idx
                 .find(resourceHref, version)
                 .ifPresent(entry -> deleteFromCache(idx, entry)));
     }
 
-    void deleteFromCache(URL resourceHref, VersionString version) {
+    void deleteFromCache(final URL resourceHref, final VersionString version) {
         cacheIndex.runSynchronized(idx -> idx
                 .findAll(resourceHref, version)
                 .forEach(entry -> deleteFromCache(idx, entry)));
     }
 
-    void deleteFromCache(String cacheId) {
+    void deleteFromCache(final String cacheId) {
         cacheIndex.runSynchronized(idx -> {
             final List<LeastRecentlyUsedCacheEntry> allEntries = idx.getAllUnDeletedEntries();
             allEntries.stream()
@@ -320,7 +325,7 @@ class LeastRecentlyUsedCache {
         }
     }
 
-    private void deleteFromCache(LeastRecentlyUsedCacheIndex idx, LeastRecentlyUsedCacheEntry entry) {
+    private void deleteFromCache(final LeastRecentlyUsedCacheIndex idx, final LeastRecentlyUsedCacheEntry entry) {
         final File cacheFile = getCacheFile(entry);
         final File directory = cacheFile.getParentFile();
 
@@ -330,7 +335,7 @@ class LeastRecentlyUsedCache {
 
             LOG.info("Deleting cached directory: {}", directory.getAbsolutePath());
             FileUtils.recursiveDelete(directory, directory);
-        } catch (IOException e) {
+        } catch (final IOException e) {
             LOG.error("Failed to delete '{}'. continue..." + directory.getAbsolutePath());
         }
 
@@ -366,30 +371,30 @@ class LeastRecentlyUsedCache {
         return true;
     }
 
-    private void deleteAll(Collection<File> files) {
+    private void deleteAll(final Collection<File> files) {
         if (files == null) {
             return;
         }
 
-        for (File file : files) {
+        for (final File file : files) {
             deleteDir(file);
         }
     }
 
-    private void deleteAll(File... files) {
+    private void deleteAll(final File... files) {
         if (files == null) {
             return;
         }
 
-        for (File file : files) {
+        for (final File file : files) {
             deleteDir(file);
         }
     }
 
-    private void deleteDir(File file) {
+    private void deleteDir(final File file) {
         try {
             FileUtils.recursiveDelete(file, file);
-        } catch (IOException e) {
+        } catch (final IOException e) {
             LOG.error("Failed to delete directory {} - {}", file, e.getMessage());
         }
     }
@@ -416,7 +421,7 @@ class LeastRecentlyUsedCache {
                 long curSize = 0;
 
                 final List<LeastRecentlyUsedCacheEntry> toRemoveFromIndex = new ArrayList<>();
-                for (LeastRecentlyUsedCacheEntry entry : idx.getAllEntries()) {
+                for (final LeastRecentlyUsedCacheEntry entry : idx.getAllEntries()) {
                     entryIdsFromIndex.add(entry.getId());
 
                     final CacheEntry infoFile = getInfoFile(entry);
@@ -453,7 +458,7 @@ class LeastRecentlyUsedCache {
 
                     final File[] cacheDirFiles = directory.listFiles();
                     if (!isNullOrEmpty(cacheDirFiles)) {
-                        for (File file : cacheDirFiles) {
+                        for (final File file : cacheDirFiles) {
                             if (!file.equals(cacheFile) && !file.getName().equals(CacheEntry.INFO_SUFFIX)) {
                                 LOG.debug("found unknown file {}", file);
                                 deleteDir(file);
@@ -489,12 +494,12 @@ class LeastRecentlyUsedCache {
         LOG.debug("done cleaning the cache");
     }
 
-    private Set<String> collectAllEntryIdsFromFileSystem(File[] levelOneDirs) {
+    private Set<String> collectAllEntryIdsFromFileSystem(final File[] levelOneDirs) {
         final Set<String> entryIds = new HashSet<>();
-        for (File levelOneDir : levelOneDirs) {
+        for (final File levelOneDir : levelOneDirs) {
             final File[] levelTwoDirs = levelOneDir.listFiles(File::isDirectory);
             if (levelTwoDirs != null) {
-                for (File levelTwoDir : levelTwoDirs) {
+                for (final File levelTwoDir : levelTwoDirs) {
                     final String entryId = entryIdFromCacheDir(levelTwoDir);
                     if (new File(levelTwoDir, CacheEntry.INFO_SUFFIX).isFile()) {
                         entryIds.add(entryId);
@@ -511,40 +516,40 @@ class LeastRecentlyUsedCache {
             final String maxSizePropertyValue = JNLPRuntime.getConfiguration().getProperty(ConfigurationConstants.KEY_CACHE_MAX_SIZE);
             final long maxSizeInMegaBytes = Long.parseLong(maxSizePropertyValue);
             return maxSizeInMegaBytes << 20; // Convert from megabyte to byte (Negative values will be considered unlimited.)
-        } catch (NumberFormatException ignored) {
+        } catch (final NumberFormatException ignored) {
             return -1;
         }
     }
 
     // Helpers
 
-    private File getCacheFile(LeastRecentlyUsedCacheEntry entry) {
+    private File getCacheFile(final LeastRecentlyUsedCacheEntry entry) {
         final String[] idParts = entry.getId().split("-");
         final String cacheFilName = getCacheFileName(entry.getResourceHref());
         return new File(String.join("/", rootCacheDir.getFullPath(), idParts[0], idParts[1], cacheFilName));
     }
 
-    private CacheEntry getInfoFile(LeastRecentlyUsedCacheEntry entry) {
+    private CacheEntry getInfoFile(final LeastRecentlyUsedCacheEntry entry) {
         final File cacheFile = getCacheFile(entry);
         final File infoFile = new File(cacheFile.getParentFile(), CacheEntry.INFO_SUFFIX);
         return new CacheEntry(entry, cacheFile, infoFile);
     }
 
-    private String entryIdFromCacheDir(File dir) {
+    private String entryIdFromCacheDir(final File dir) {
         return dir.getParentFile().getName() + "-" + dir.getName();
     }
 
-    private File cacheDirFromEntryId(String entryId) {
+    private File cacheDirFromEntryId(final String entryId) {
         final String[] idParts = entryId.split("-");
         return new File(String.join("/", rootCacheDir.getFullPath(), idParts[0], idParts[1]));
     }
 
-    private String getCacheFileName(URL resourceHref) {
+    private String getCacheFileName(final URL resourceHref) {
         final String fileName = extractFileNameFromUrl(resourceHref);
         return isBlank(fileName) ? "0" : fileName;
     }
 
-    private String extractFileNameFromUrl(URL resourceHref) {
+    private String extractFileNameFromUrl(final URL resourceHref) {
         final String path = resourceHref.getPath();
         final int i = path.lastIndexOf('/');
         if (i < 0) {
@@ -596,14 +601,14 @@ class LeastRecentlyUsedCache {
                 LOG.info("No instance file found");
                 return true;
             }
-        } catch (IOException e) {
+        } catch (final IOException e) {
             LOG.error("Failed to lock MAIN_LOCK (" + PathsAndFiles.MAIN_LOCK.getFullPath() + ")", e);
             return false;
         } finally {
             if (locking != null) {
                 try {
                     locking.release();
-                } catch (IOException ex) {
+                } catch (final IOException ex) {
                     LOG.error("failed to unlock the MAIN_LOCK", ex);
                 }
             }

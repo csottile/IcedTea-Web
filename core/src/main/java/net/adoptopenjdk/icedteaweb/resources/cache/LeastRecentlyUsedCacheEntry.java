@@ -17,7 +17,7 @@ class LeastRecentlyUsedCacheEntry implements Comparable<LeastRecentlyUsedCacheEn
     private final URL resourceHref;
     private final VersionId version;
 
-    LeastRecentlyUsedCacheEntry(String id, long lastAccessed, URL resourceHref, VersionId version) {
+    LeastRecentlyUsedCacheEntry(final String id, final long lastAccessed, final URL resourceHref, final VersionId version) {
         this.id = id;
         this.lastAccessed = lastAccessed;
         this.markedForDeletion = false;
@@ -25,12 +25,16 @@ class LeastRecentlyUsedCacheEntry implements Comparable<LeastRecentlyUsedCacheEn
         this.version = version;
     }
 
-    LeastRecentlyUsedCacheEntry(String id, URL resourceHref, VersionId version) {
+    private LeastRecentlyUsedCacheEntry(final String id, final URL resourceHref, final VersionId version) {
         this.id = id;
         this.lastAccessed = 0;
         this.markedForDeletion = true;
         this.resourceHref = resourceHref;
         this.version = version;
+    }
+
+    LeastRecentlyUsedCacheEntry markAsDeleted() {
+        return new LeastRecentlyUsedCacheEntry(id, resourceHref, version);
     }
 
     String getId() {
@@ -57,15 +61,15 @@ class LeastRecentlyUsedCacheEntry implements Comparable<LeastRecentlyUsedCacheEn
         return markedForDeletion;
     }
 
-    boolean matches(URL resource) {
+    boolean matches(final URL resource) {
         return this.resourceHref.equals(resource);
     }
 
-    boolean matches(URL resource, VersionId versionId) {
+    boolean matches(final URL resource, final VersionId versionId) {
         return matches(resource) && Objects.equals(versionId, version);
     }
 
-    boolean matches(URL resource, VersionString versionString) {
+    boolean matches(final URL resource, final VersionString versionString) {
         if (matches(resource)) {
             if (versionString == null && version == null) {
                 return true;
@@ -78,16 +82,20 @@ class LeastRecentlyUsedCacheEntry implements Comparable<LeastRecentlyUsedCacheEn
     }
 
     @Override
-    public int compareTo(LeastRecentlyUsedCacheEntry o) {
+    public int compareTo(final LeastRecentlyUsedCacheEntry o) {
         // this will sort in least recently used order
         return Long.compare(o.lastAccessed, this.lastAccessed);
     }
 
     @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        LeastRecentlyUsedCacheEntry entry = (LeastRecentlyUsedCacheEntry) o;
+    public boolean equals(final Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        final LeastRecentlyUsedCacheEntry entry = (LeastRecentlyUsedCacheEntry) o;
         return id.equals(entry.id);
     }
 

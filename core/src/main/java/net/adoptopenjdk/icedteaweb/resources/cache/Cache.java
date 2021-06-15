@@ -51,10 +51,17 @@ public class Cache {
         if (isNonCacheable(resource)) {
             throw new IllegalArgumentException(resource + " is not a cacheable resource");
         }
-        return LeastRecentlyUsedCache.getInstance().getOrCreateCacheFile(resource, version);
+        return LeastRecentlyUsedCache.getInstance().getCacheFile(resource, version);
     }
 
-    public static File addToCache(DownloadInfo infoFromRemote, InputStream unpackedStream) throws IOException {
+    public static File getOrCreateCacheFile(final URL resource, final VersionId version) {
+        if (isNonCacheable(resource)) {
+            throw new IllegalArgumentException(resource + " is not a cacheable resource");
+        }
+        return LeastRecentlyUsedCache.getInstance().createCacheFile(resource, version);
+    }
+
+    public static File addToCache(final DownloadInfo infoFromRemote, final InputStream unpackedStream) throws IOException {
         if (isNonCacheable(infoFromRemote.getResourceHref())) {
             throw new IllegalArgumentException(infoFromRemote.getResourceHref() + " is not a cacheable resource");
         }
@@ -66,25 +73,24 @@ public class Cache {
      *
      * @param resource the resource {@link URL}
      * @param version  the versions
-     * @return the newly created cache file (which of course will be empty)
      * @throws IllegalArgumentException if the resource is not cacheable
      */
-    public static File replaceExistingCacheFile(final URL resource, final VersionId version) {
+    public static void invalidateExistingCacheFile(final URL resource, final VersionId version) {
         if (isNonCacheable(resource)) {
             throw new IllegalArgumentException(resource + " is not a cacheable resource");
         }
-        return LeastRecentlyUsedCache.getInstance().replaceExistingCacheFile(resource, version);
+        LeastRecentlyUsedCache.getInstance().invalidateExistingCacheFile(resource, version);
     }
 
-    public static void markAsCorrupted(URL resource, VersionId version) {
+    public static void markAsCorrupted(final URL resource, final VersionId version) {
         LeastRecentlyUsedCache.getInstance().markAsCorrupted(resource, version);
     }
 
-    public static void deleteFromCache(ResourceInfo info) {
+    public static void deleteFromCache(final ResourceInfo info) {
         LeastRecentlyUsedCache.getInstance().deleteFromCache(info.getResourceHref(), info.getVersion());
     }
 
-    public static void deleteFromCache(URL resource, VersionString version) {
+    public static void deleteFromCache(final URL resource, final VersionString version) {
         if (isNonCacheable(resource)) {
             throw new IllegalArgumentException(resource + " is not a cacheable resource");
         }
@@ -161,7 +167,7 @@ public class Cache {
      * @return whether the cache contains the version
      * @throws IllegalArgumentException if the resource is not cacheable
      */
-    public static boolean isUpToDate(final URL resource, final VersionId version, long lastModified) {
+    public static boolean isUpToDate(final URL resource, final VersionId version, final long lastModified) {
         if (isNonCacheable(resource)) {
             throw new IllegalArgumentException(resource + " is not a cacheable resource");
         }

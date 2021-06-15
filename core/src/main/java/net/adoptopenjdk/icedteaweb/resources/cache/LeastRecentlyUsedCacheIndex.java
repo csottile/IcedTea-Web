@@ -39,7 +39,7 @@ class LeastRecentlyUsedCacheIndex {
 
     private boolean dirty = false;
 
-    LeastRecentlyUsedCacheIndex(PropertiesFile propertiesFile, List<LeastRecentlyUsedCacheEntry> entries) {
+    LeastRecentlyUsedCacheIndex(final PropertiesFile propertiesFile, final List<LeastRecentlyUsedCacheEntry> entries) {
         this.propertiesFile = propertiesFile;
         this.entries = entries;
     }
@@ -49,7 +49,7 @@ class LeastRecentlyUsedCacheIndex {
      *
      * @return the entry found or {@code empty}, never {@code null}.
      */
-    Optional<LeastRecentlyUsedCacheEntry> find(URL resourceHref, VersionId version) {
+    Optional<LeastRecentlyUsedCacheEntry> find(final URL resourceHref, final VersionId version) {
         return entries.stream()
                 .filter(e -> !e.isMarkedForDeletion())
                 .filter(e -> e.matches(resourceHref, version))
@@ -61,7 +61,7 @@ class LeastRecentlyUsedCacheIndex {
      *
      * @return the entry found or {@code empty}, never {@code null}.
      */
-    Optional<LeastRecentlyUsedCacheEntry> findAndMarkAsAccessed(URL resourceHref, VersionId version) {
+    Optional<LeastRecentlyUsedCacheEntry> findAndMarkAsAccessed(final URL resourceHref, final VersionId version) {
         final Optional<LeastRecentlyUsedCacheEntry> result = find(resourceHref, version);
 
         result.ifPresent(this::markAccessed);
@@ -74,7 +74,7 @@ class LeastRecentlyUsedCacheIndex {
      *
      * @return a set of all matching entries, never {@code null}.
      */
-    Set<LeastRecentlyUsedCacheEntry> findAll(URL resourceHref) {
+    Set<LeastRecentlyUsedCacheEntry> findAll(final URL resourceHref) {
         return entries.stream()
                 .filter(e -> !e.isMarkedForDeletion())
                 .filter(e -> e.matches(resourceHref))
@@ -86,7 +86,7 @@ class LeastRecentlyUsedCacheIndex {
      *
      * @return a set of all matching entries, never {@code null}.
      */
-    Set<LeastRecentlyUsedCacheEntry> findAll(URL resourceHref, VersionString versionString) {
+    Set<LeastRecentlyUsedCacheEntry> findAll(final URL resourceHref, final VersionString versionString) {
         return entries.stream()
                 .filter(e -> !e.isMarkedForDeletion())
                 .filter(e -> e.matches(resourceHref, versionString))
@@ -114,7 +114,7 @@ class LeastRecentlyUsedCacheIndex {
      *
      * @return the newly created entry
      */
-    LeastRecentlyUsedCacheEntry createEntry(URL resourceHref, VersionId version, String entryId) {
+    LeastRecentlyUsedCacheEntry createEntry(final URL resourceHref, final VersionId version, final String entryId) {
         final long now = System.currentTimeMillis();
         final LeastRecentlyUsedCacheEntry newEntry = new LeastRecentlyUsedCacheEntry(entryId, now, resourceHref, version);
         entries.add(0, newEntry);
@@ -131,10 +131,9 @@ class LeastRecentlyUsedCacheIndex {
     /**
      * Marks the entry for deletion
      */
-    void markEntryForDeletion(URL resourceHref, VersionId version) {
+    void markEntryForDeletion(final URL resourceHref, final VersionId version) {
         find(resourceHref, version).ifPresent(entry -> {
             entries.remove(entry);
-            entries.add(new LeastRecentlyUsedCacheEntry(entry.getId(), entry.getResourceHref(), entry.getVersion()));
             propertiesFile.setProperty(entry.getId() + '.' + KEY_DELETE, TRUE.toString());
             dirty = true;
         });
@@ -143,14 +142,14 @@ class LeastRecentlyUsedCacheIndex {
     /**
      * Removes an entry from the index. If not entry matches nothing is changed.
      */
-    void removeEntry(URL resourceHref, VersionId version) {
+    void removeEntry(final URL resourceHref, final VersionId version) {
         find(resourceHref, version).ifPresent(this::removeEntry);
     }
 
     /**
      * Removes an entry from the index.
      */
-    void removeEntry(LeastRecentlyUsedCacheEntry entry) {
+    void removeEntry(final LeastRecentlyUsedCacheEntry entry) {
         entries.remove(entry);
         propertiesFile.remove(entry.getId() + '.' + KEY_HREF);
         propertiesFile.remove(entry.getId() + '.' + KEY_VERSION);
@@ -172,7 +171,7 @@ class LeastRecentlyUsedCacheIndex {
         return dirty;
     }
 
-    private void markAccessed(LeastRecentlyUsedCacheEntry entry) {
+    private void markAccessed(final LeastRecentlyUsedCacheEntry entry) {
         final long now = System.currentTimeMillis();
         entries.remove(entry);
         entries.add(0, new LeastRecentlyUsedCacheEntry(entry.getId(), now, entry.getResourceHref(), entry.getVersion()));
@@ -185,14 +184,14 @@ class LeastRecentlyUsedCacheIndex {
      *
      * @return true, if cache was corrupted and affected entry removed
      */
-    static ConversionResult convertPropertiesToEntries(PropertiesFile props) {
+    static ConversionResult convertPropertiesToEntries(final PropertiesFile props) {
         boolean modified = false;
 
         // STEP 1
         // group all properties with the same ID together
         // throwing away entries which do not have a valid key
         final Map<String, Map<String, String>> id2ValueMap = new HashMap<>();
-        for (Map.Entry<String, String> propEntry : new HashSet<>(props.entrySet())) {
+        for (final Map.Entry<String, String> propEntry : new HashSet<>(props.entrySet())) {
             final String key = propEntry.getKey();
             if (key != null) {
                 final String[] keyParts = splitKey(key);
@@ -213,7 +212,7 @@ class LeastRecentlyUsedCacheIndex {
         // convert the properties to actual entries
         // collecting the IDs of the ones which have invalid data
         final List<LeastRecentlyUsedCacheEntry> entries = new ArrayList<>(id2ValueMap.size());
-        for (Map.Entry<String, Map<String, String>> valuesEntry : id2ValueMap.entrySet()) {
+        for (final Map.Entry<String, Map<String, String>> valuesEntry : id2ValueMap.entrySet()) {
             final Map<String, String> values = valuesEntry.getValue();
 
             final String id = valuesEntry.getKey();
@@ -225,13 +224,11 @@ class LeastRecentlyUsedCacheIndex {
             try {
                 final VersionId version = versionValue != null ? VersionId.fromString(versionValue) : null;
                 final URL resourceHref = new URL(resourceHrefValue);
-                if (Boolean.parseBoolean(markedForDeletionValue)) {
-                    entries.add(new LeastRecentlyUsedCacheEntry(id, resourceHref, version));
-                } else {
+                if (!Boolean.parseBoolean(markedForDeletionValue)) {
                     final long lastAccessed = Long.parseLong(lastAccessedValue);
                     entries.add(new LeastRecentlyUsedCacheEntry(id, lastAccessed, resourceHref, version));
                 }
-            } catch (Exception e) {
+            } catch (final Exception e) {
                 LOG.debug("found broken ID: {}", id);
                 props.remove(id + '.' + KEY_LAST_ACCESSED);
                 props.remove(id + '.' + KEY_DELETE);
@@ -247,7 +244,7 @@ class LeastRecentlyUsedCacheIndex {
         return new ConversionResult(modified, entries);
     }
 
-    private static String[] splitKey(String key) {
+    private static String[] splitKey(final String key) {
         final int i = key.indexOf('.');
         if (i > 0 && i < key.length()) {
             return new String[]{key.substring(0, i), key.substring(i + 1)};
@@ -259,7 +256,7 @@ class LeastRecentlyUsedCacheIndex {
         final boolean propertiesNeedToBeStored;
         final List<LeastRecentlyUsedCacheEntry> entries;
 
-        private ConversionResult(boolean propertiesNeedToBeStored, List<LeastRecentlyUsedCacheEntry> entries) {
+        private ConversionResult(final boolean propertiesNeedToBeStored, final List<LeastRecentlyUsedCacheEntry> entries) {
             this.propertiesNeedToBeStored = propertiesNeedToBeStored;
             this.entries = entries;
         }

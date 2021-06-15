@@ -29,7 +29,7 @@ class NotifyingInputStream extends FilterInputStream {
 
         return Long.max(totalSize / 1000, 100);
     }
-
+    
     @Override
     public int read() throws IOException {
         final int value = super.read();

@@ -116,7 +116,7 @@ abstract class BaseResourceDownloader implements ResourceDownloader {
         globalFixedThreadPool().execute(() -> {
             try {
                 result.complete(tryDownloading(url));
-            } catch (Exception e) {
+            } catch (final Exception e) {
                 result.completeExceptionally(e);
             }
         });
@@ -139,7 +139,7 @@ abstract class BaseResourceDownloader implements ResourceDownloader {
             resource.setStatus(DOWNLOADED);
             resource.setTransferred(bytesTransferred);
             return resource;
-        } catch (Exception ex) {
+        } catch (final Exception ex) {
             if (downloadDetails != null) {
                 LOG.debug("Marking as corrupted {}", resource);
                 Cache.markAsCorrupted(resource.getLocation(), getVersion(downloadDetails.downloadFrom, downloadDetails.version));
@@ -208,7 +208,7 @@ abstract class BaseResourceDownloader implements ResourceDownloader {
             }
 
             return new DownloadDetails(downloadFrom, inputStream, contentType, contentEncoding, version, lastModified, totalSize);
-        } catch (IOException ex) {
+        } catch (final IOException ex) {
             if (INVALID_HTTP_RESPONSE.equals(ex.getMessage())) {
                 LOG.warn(INVALID_HTTP_RESPONSE + " message detected. Attempting direct socket");
                 return getInputStreamFromDirectSocket(downloadFrom);
@@ -246,9 +246,9 @@ abstract class BaseResourceDownloader implements ResourceDownloader {
             String head = "";
             byte[] body = new byte[0];
             //we can't use buffered reader, otherwise buffer consume also part of body
-            try (InputStream is = s.getInputStream()) {
+            try (final InputStream is = s.getInputStream()) {
                 while (true) {
-                    int readChar = is.read();
+                    final int readChar = is.read();
                     if (readChar < 0) {
                         break;
                     }
@@ -262,7 +262,7 @@ abstract class BaseResourceDownloader implements ResourceDownloader {
         }
     }
 
-    private static boolean endsWithBlankLine(String head) {
+    private static boolean endsWithBlankLine(final String head) {
         return head.endsWith("\n\n")
                 || head.endsWith("\r\n\r\n")
                 || head.endsWith("\n\r\n\r")
@@ -272,7 +272,7 @@ abstract class BaseResourceDownloader implements ResourceDownloader {
     private long parseLong(final String s, final long defaultValue) {
         try {
             return Long.parseLong(s);
-        } catch (Exception ignored) {
+        } catch (final Exception ignored) {
             return defaultValue;
         }
     }
@@ -280,15 +280,15 @@ abstract class BaseResourceDownloader implements ResourceDownloader {
     private <R> Optional<R> futureToOptional(final Future<R> future) {
         try {
             return Optional.ofNullable(future.get());
-        } catch (InterruptedException | ExecutionException e) {
+        } catch (final InterruptedException | ExecutionException e) {
             downLoadExceptions.add(e);
             return Optional.empty();
         }
     }
 
-    void invalidateExistingEntryInCache(VersionId version) {
+    void invalidateExistingEntryInCache(final VersionId version) {
         final URL location = resource.getLocation();
         LOG.debug("Invalidating resource in cache: {} / {}", location, version);
-        Cache.replaceExistingCacheFile(location, version);
+        Cache.invalidateExistingCacheFile(location, version);
     }
 }

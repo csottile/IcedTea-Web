@@ -42,11 +42,11 @@ abstract class BaseResourceInitializer implements ResourceInitializer {
 
     protected final Resource resource;
 
-    BaseResourceInitializer(Resource resource) {
+    BaseResourceInitializer(final Resource resource) {
         this.resource = resource;
     }
 
-    InitializationResult initFromCache(VersionId version) {
+    InitializationResult initFromCache(final VersionId version) {
         final File cachedFile = Cache.getCacheFile(this.resource.getLocation(), version);
 
         resource.setStatus(DOWNLOADED);
@@ -59,26 +59,26 @@ abstract class BaseResourceInitializer implements ResourceInitializer {
         return new InitializationResult();
     }
 
-    InitializationResult initFromHeadResult(UrlRequestResult requestResult) {
+    InitializationResult initFromHeadResult(final UrlRequestResult requestResult) {
         resource.setSize(requestResult.getContentLength());
         return new InitializationResult(requestResult.getUrl());
     }
 
-    void invalidateExistingEntryInCache(VersionId version) {
+    void invalidateExistingEntryInCache(final VersionId version) {
         final URL location = resource.getLocation();
         LOG.debug("Invalidating resource in cache: {} / {}", location, version);
-        Cache.replaceExistingCacheFile(location, version);
+        Cache.invalidateExistingCacheFile(location, version);
     }
 
     DownloadOptions getDownloadOptions() {
-        DownloadOptions options = resource.getDownloadOptions();
+        final DownloadOptions options = resource.getDownloadOptions();
         if (options == null) {
             return DownloadOptions.NONE;
         }
         return options;
     }
 
-    Optional<UrlRequestResult> getBestUrlByPingingWithHeadRequest(List<URL> urls) {
+    Optional<UrlRequestResult> getBestUrlByPingingWithHeadRequest(final List<URL> urls) {
         final List<Callable<UrlRequestResult>> callables = urls.stream()
                 .map(url -> (Callable<UrlRequestResult>) () -> testUrl(url))
                 .collect(Collectors.toList());
@@ -88,13 +88,13 @@ abstract class BaseResourceInitializer implements ResourceInitializer {
 
         try {
             return Optional.ofNullable(future.get());
-        } catch (InterruptedException | ExecutionException e) {
-            LOG.debug("failed to determine best URL: {}",  e.getMessage());
+        } catch (final InterruptedException | ExecutionException e) {
+            LOG.debug("failed to determine best URL: {}", e.getMessage());
             return Optional.empty();
         }
     }
 
-    private UrlRequestResult testUrl(URL url) throws IOException {
+    private UrlRequestResult testUrl(final URL url) throws IOException {
         final HttpMethod requestMethod = HttpMethod.HEAD;
         try {
             final Map<String, String> requestProperties = new HashMap<>();
@@ -102,7 +102,7 @@ abstract class BaseResourceInitializer implements ResourceInitializer {
 
             final UrlRequestResult response = UrlProber.getUrlResponseCodeWithRedirectionResult(url, requestProperties, requestMethod);
             if (response.getResponseCode() == NETWORK_AUTHENTICATION_REQUIRED && !InetSecurity511Panel.isSkip()) {
-                boolean result511 = SecurityDialogs.show511Dialogue(resource);
+                final boolean result511 = SecurityDialogs.show511Dialogue(resource);
                 if (!result511) {
                     throw new RuntimeException("Terminated on users request after encountering 'http 511 authentication'.");
                 }
@@ -124,7 +124,7 @@ abstract class BaseResourceInitializer implements ResourceInitializer {
 
             LOG.debug("Best url for {} is {} by {}", resource.toString(), url.toString(), requestMethod);
             return response;
-        } catch (IOException e) {
+        } catch (final IOException e) {
             LOG.debug("While processing {}  by {} for resource {} got {}", url, requestMethod, resource, e.getMessage());
             throw e;
         }
